@@ -1,0 +1,38 @@
+{
+  "name": "scan_typescript_code",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "ts-node --esm './src/index.ts'",
+    "build": "tsc && npm link",
+    "watch": "tsc --watch"
+  },
+  "bin": {
+    "ca": "bin/src/index.js"
+  },
+  "author": "wangtianyou",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^18.15.11",
+    "chalk": "^5.2.0",
+    "commander": "^10.0.0",
+    "glob": "^9.3.2",
+    "ora": "^6.3.0",
+    "typescript": "^5.0.2"
+  },
+  "dependencies": {},
+  "directories": {
+    "example": "example"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/balabalapupu/scan_typescript_code.git"
+  },
+  "bugs": {
+    "url": "https://github.com/balabalapupu/scan_typescript_code/issues"
+  },
+  "homepage": "https://github.com/balabalapupu/scan_typescript_code#readme",
+  "description": ""
+}
