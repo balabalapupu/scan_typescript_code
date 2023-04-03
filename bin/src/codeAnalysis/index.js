@@ -1,12 +1,33 @@
 import chalk from "chalk";
+import path from "path";
 import { scanFilesForEntirys } from "../file/index.js";
 import processLog from "single-line-log";
+import piscina from "piscina";
+import { fileURLToPath } from "url";
+import { Worker } from "worker_threads";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { checkPropertyAccess, parseFilesForAST, } from "../parse/index.js";
 import tsCompiler from "typescript";
-import identifierCheck from "../../IdetifierPlugin.js";
+import identifierCheck from "../plugins/IdetifierPlugin.js";
 import defaultPlugin from "../plugins/defaultPlugin.js";
 import methodPlugin from "../plugins/methodPlugin.js";
 import typePlugin from "../plugins/typePlugin.js";
+import browserPlugin from "../plugins/browserPlugin.js";
+const runSerice = (workerData) => {
+    return new Promise((resolve, reject) => {
+        const worker = new Worker(path.join(__dirname, "./worker.js"), {
+            workerData: workerData,
+        });
+        worker.on("message", resolve);
+        worker.on("error", reject);
+        worker.on("exit", (code) => {
+            if (code !== 0)
+                reject(new Error(`Worker Thread stopped with exit code ${code}`));
+        });
+    });
+};
+const pool = new piscina();
 export class CodeAnalysisCore {
     scanSourceConfig;
     analysisImportsTarget;
@@ -19,18 +40,27 @@ export class CodeAnalysisCore {
     pluginStoreList;
     analysisPlugins;
     hookNameMap;
+    browserApiTarget;
     constructor(options) {
+        // 扫描路径配置
         this.scanSourceConfig = options.scanSource;
+        // import 生命查找配置
         this.analysisImportsTarget = options.analysisImportsTarget;
+        // 目标标识符配置
         this.analysisIdentifierTarget =
             options.analysisIdentifierTarget || [];
+        // 浏览器 api
+        this.browserApiTarget = options.browserApiTarget || [];
+        // 自定义插件
         this.analysisPlugins = options.analysisPlugins || [];
+        // 内置插件
         this.hookFuncionQueue = [
+            browserPlugin,
             identifierCheck,
             methodPlugin,
             typePlugin,
             defaultPlugin,
-        ]; // 先用这个顶一下 hook， 跑通了记得改一下
+        ]; // 先用这个顶一下 hook，可以改成tapable
         this.afterParseHookQueue = [];
         this.afterAnalysisHookQueue = [];
         this.importItemMap = {};
@@ -84,6 +114,7 @@ export class CodeAnalysisCore {
         console.log(chalk.green("文件扫描开始"));
         this.scanCodeFormConfig(this.scanSourceConfig, "vue");
         this.scanCodeFormConfig(this.scanSourceConfig, "ts");
+        console.log("done!");
     };
     scanCodeFormConfig = (config, PluginContextType) => {
         // 拿到所有需要扫描的文件路径，可能有多个scanSource
@@ -94,15 +125,42 @@ export class CodeAnalysisCore {
         });
         return;
     };
-    parseCodeAndReport = (config, type) => {
+    // parseCodeAndReportPromise: CodeAnalysisCore.parseCodeAndReport<CODEFILETYPE> =
+    //   async (config, type) => {
+    //     const parseFiles = config.parse || [];
+    //     if (!parseFiles.length) return;
+    //     await Promise.all(
+    //       parseFiles.map(async (item, index) => {
+    //         const filePath = parseFiles[index];
+    //         const res = await this.runPluginworker({
+    //           filePath,
+    //           type,
+    //         });
+    //       })
+    //     );
+    //   };
+    runPluginworker = (workerData) => {
+        return new Promise((resolve, reject) => {
+            const worker = new Worker(path.join(__dirname, "./worker.js"), {
+                workerData: workerData,
+            });
+            worker.on("message", resolve);
+            worker.on("error", reject);
+            worker.on("exit", (code) => {
+                if (code !== 0)
+                    reject(new Error(`Worker Thread stopped with exit code ${code}`));
+            });
+        });
+    };
+    parseCodeAndReport = async (config, type) => {
         const parseFiles = config.parse || [];
         if (!parseFiles.length)
             return;
         console.log("\n|-文件类型:", chalk.green(type));
         console.log("|-分析进度:");
         // 根据当前文件夹下的依赖在做遍历
-        parseFiles.forEach((_item, _index) => {
-            const filePath = config.name + "&" + parseFiles[_index];
+        parseFiles.forEach(async (_item, _index) => {
+            const filePath = parseFiles[_index];
             processLog.stdout(`|--${chalk.green(`${_index + 1}/${parseFiles.length}      ${filePath}`)}`);
             try {
                 // 1、 生成 AST

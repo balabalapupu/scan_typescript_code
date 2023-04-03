@@ -30,8 +30,10 @@
     "clone-deep": "^4.0.1",
     "js-md5": "^0.7.3",
     "moment": "^2.29.4",
+    "piscina": "^3.2.0",
     "single-line-log": "^1.1.2",
-    "table": "^6.8.1"
+    "table": "^6.8.1",
+    "url": "^0.11.0"
   },
   "directories": {
     "example": "example"

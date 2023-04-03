@@ -55,7 +55,15 @@ export const checkPropertyAccess: CheckPropertyAccess = (
   } else {
     apiName = apiName + _node.escapedText;
   }
+
   if (tsCompiler.isPropertyAccessExpression(_node.parent)) {
+    if (_node.parent.expression && _node.parent.expression.kind == 108) {
+      return {
+        baseNode: _node,
+        depth: index,
+        apiName: "this." + apiName,
+      };
+    }
     index++;
     return checkPropertyAccess(_node.parent, index, apiName);
   } else {

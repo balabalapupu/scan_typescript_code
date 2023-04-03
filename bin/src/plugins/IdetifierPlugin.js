@@ -1,5 +1,5 @@
 import tsCompiler from "typescript";
-import { checkPropertyAccess } from "./src/parse/index.js";
+import { checkPropertyAccess } from "../parse/index.js";
 const identifierCheck = (analysisContext) => {
     const mapName = "IdentifierCheckPlugin";
     // 在分析实例上下文挂载副作用
@@ -17,7 +17,7 @@ const identifierCheck = (analysisContext) => {
 const pluginFunc = ({ AST, baseLine, filePath }, context, mapName) => {
     const targetIndetifier = context.analysisIdentifierTarget;
     if (targetIndetifier.length == 0)
-        return true;
+        return false;
     function walk(node) {
         tsCompiler.forEachChild(node, walk);
         if (!AST)

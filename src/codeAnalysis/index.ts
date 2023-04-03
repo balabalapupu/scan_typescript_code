@@ -11,20 +11,45 @@ import {
   PluginContextType,
   HookList,
 } from "../../type";
+import path from "path";
 import { CODEFILETYPE } from "../constant/index.js";
 import { scanFilesForEntirys } from "../file/index.js";
 import processLog from "single-line-log";
+import piscina from "piscina";
+import { fileURLToPath } from "url";
+import { Worker } from "worker_threads";
+
+const __filename = fileURLToPath(import.meta.url);
+
+const __dirname = path.dirname(__filename);
+
 import {
   checkPropertyAccess,
   parseFilesForAST,
+  ParseFilesForASTType,
   ParseTsReturnType,
 } from "../parse/index.js";
 import tsCompiler from "typescript";
-import identifierCheck from "../../IdetifierPlugin.js";
+import identifierCheck from "../plugins/IdetifierPlugin.js";
 
 import defaultPlugin from "../plugins/defaultPlugin.js";
 import methodPlugin from "../plugins/methodPlugin.js";
 import typePlugin from "../plugins/typePlugin.js";
+import browserPlugin from "../plugins/browserPlugin.js";
+
+const runSerice = (workerData: any) => {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(path.join(__dirname, "./worker.js"), {
+      workerData: workerData,
+    });
+    worker.on("message", resolve);
+    worker.on("error", reject);
+    worker.on("exit", (code: number) => {
+      if (code !== 0)
+        reject(new Error(`Worker Thread stopped with exit code ${code}`));
+    });
+  });
+};
 
 type CODEFILETYPE = "ts" | "vue";
 type runAnalysisPluginsConfigType = {
@@ -61,6 +86,8 @@ type analysisImportsTargetFuncArgType = {
 };
 
 type hookQueue = any[];
+
+const pool = new piscina();
 
 export namespace CodeAnalysisCore {
   export type diagnosisInfos = DiagnosisInfosType[];
@@ -131,12 +158,15 @@ export class CodeAnalysisCore {
     // 目标标识符配置
     this.analysisIdentifierTarget =
       options.analysisIdentifierTarget || ([] as string[]);
-    // 自定义插件
-    this.analysisPlugins = options.analysisPlugins || ([] as string[]);
+    // 浏览器 api
     this.browserApiTarget = options.browserApiTarget || ([] as string[]);
+    // 自定义插件
+
+    this.analysisPlugins = options.analysisPlugins || ([] as string[]);
 
     // 内置插件
     this.hookFuncionQueue = [
+      browserPlugin,
       identifierCheck,
       methodPlugin,
       typePlugin,
@@ -210,6 +240,7 @@ export class CodeAnalysisCore {
     console.log(chalk.green("文件扫描开始"));
     this.scanCodeFormConfig(this.scanSourceConfig, "vue");
     this.scanCodeFormConfig(this.scanSourceConfig, "ts");
+    console.log("done!");
   };
 
   private scanCodeFormConfig: CodeAnalysisCore.scanCodeFormConfig<CODEFILETYPE> =
@@ -224,60 +255,93 @@ export class CodeAnalysisCore {
       return;
     };
 
-  parseCodeAndReport: CodeAnalysisCore.parseCodeAndReport<CODEFILETYPE> = (
-    config,
-    type
-  ) => {
-    const parseFiles = config.parse || [];
-    if (!parseFiles.length) return;
-    console.log("\n|-文件类型:", chalk.green(type));
-    console.log("|-分析进度:");
-    // 根据当前文件夹下的依赖在做遍历
-    parseFiles.forEach((_item, _index) => {
-      const filePath = config.name + "&" + parseFiles[_index];
-      processLog.stdout(
-        `|--${chalk.green(
-          `${_index + 1}/${parseFiles.length}      ${filePath}`
-        )}`
-      );
-      try {
-        // 1、 生成 AST
-        const {
-          AST,
-          typeChecking,
-          baseLine = 0,
-        } = parseFilesForAST(_item, type);
-        this.callHook(
-          this.afterParseHookQueue,
-          {
-            AST,
-            typeChecking,
-            baseLine,
-            filePath,
-          },
-          0
-        );
+  // parseCodeAndReportPromise: CodeAnalysisCore.parseCodeAndReport<CODEFILETYPE> =
+  //   async (config, type) => {
+  //     const parseFiles = config.parse || [];
+  //     if (!parseFiles.length) return;
 
-        // 查找 ImportDeclaration
-        if (this.analysisImportsTarget) {
-          this.analysisImportsTargetFunc({
-            AST,
-            typeChecking,
-            baseLine,
-            filePath,
-            config,
-          });
-        }
-      } catch (error: any) {
-        const info = {
-          projectName: config.name,
-          file: parseFiles[_index],
-          stack: error.stack,
-        };
-        this.addDiagnosisInfo(info);
-      }
+  //     await Promise.all(
+  //       parseFiles.map(async (item, index) => {
+  //         const filePath = parseFiles[index];
+  //         const res = await this.runPluginworker({
+  //           filePath,
+  //           type,
+  //         });
+  //       })
+  //     );
+  //   };
+
+  runPluginworker = (
+    workerData: any
+  ): Promise<ReturnType<ParseFilesForASTType>> => {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker(path.join(__dirname, "./worker.js"), {
+        workerData: workerData,
+      });
+      worker.on("message", resolve);
+      worker.on("error", reject);
+      worker.on("exit", (code: number) => {
+        if (code !== 0)
+          reject(new Error(`Worker Thread stopped with exit code ${code}`));
+      });
     });
   };
+
+  parseCodeAndReport: CodeAnalysisCore.parseCodeAndReport<CODEFILETYPE> =
+    async (config, type) => {
+      const parseFiles = config.parse || [];
+      if (!parseFiles.length) return;
+      console.log("\n|-文件类型:", chalk.green(type));
+      console.log("|-分析进度:");
+
+      // 根据当前文件夹下的依赖在做遍历
+      parseFiles.forEach(async (_item, _index) => {
+        const filePath = parseFiles[_index];
+        processLog.stdout(
+          `|--${chalk.green(
+            `${_index + 1}/${parseFiles.length}      ${filePath}`
+          )}`
+        );
+
+        try {
+          // 1、 生成 AST
+          const {
+            AST,
+            typeChecking,
+            baseLine = 0,
+          } = parseFilesForAST(_item, type);
+
+          this.callHook(
+            this.afterParseHookQueue,
+            {
+              AST,
+              typeChecking,
+              baseLine,
+              filePath,
+            },
+            0
+          );
+
+          // 查找 ImportDeclaration
+          if (this.analysisImportsTarget) {
+            this.analysisImportsTargetFunc({
+              AST,
+              typeChecking,
+              baseLine,
+              filePath,
+              config,
+            });
+          }
+        } catch (error: any) {
+          const info = {
+            projectName: config.name,
+            file: parseFiles[_index],
+            stack: error.stack,
+          };
+          this.addDiagnosisInfo(info);
+        }
+      });
+    };
 
   private analysisImportsTargetFunc: CodeAnalysisCore.AnalysisImportsTargetFuncType =
     ({ AST, baseLine, typeChecking, filePath, config }) => {

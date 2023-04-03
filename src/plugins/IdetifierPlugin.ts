@@ -1,11 +1,11 @@
-import { CodeAnalysisCore } from "./src/codeAnalysis/index.js";
+import { CodeAnalysisCore } from "../codeAnalysis/index.js";
 import {
   HookCallback,
   AfterParseHookArgType,
   PluginFuncType,
-} from "./type/index.js";
+} from "../../type/index.js";
 import tsCompiler from "typescript";
-import { checkPropertyAccess } from "./src/parse/index.js";
+import { checkPropertyAccess } from "../parse/index.js";
 
 type pluginFunc = (
   config: AfterParseHookArgType,
@@ -37,7 +37,7 @@ const pluginFunc: pluginFunc = (
   mapName
 ): boolean => {
   const targetIndetifier = context.analysisIdentifierTarget;
-  if (targetIndetifier.length == 0) return true;
+  if (targetIndetifier.length == 0) return false;
   function walk(node: tsCompiler.Node) {
     tsCompiler.forEachChild(node, walk);
     if (!AST) return;
