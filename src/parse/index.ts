@@ -4,10 +4,12 @@ import {
   CODEFILETYPE,
   CommonTsCompilerNode,
 } from "../../type";
+import { parseVue } from "./parseVue.js";
 
 export type ParseTsReturnType = {
   AST: tsCompiler.SourceFile | undefined;
   typeChecking: tsCompiler.TypeChecker;
+  baseLine?: number;
 };
 export type ParseFilesForASTType = (
   filePath: string,
@@ -28,7 +30,7 @@ export const parseFilesForAST: ParseFilesForASTType = (filePath, parseType) => {
   if (parseType == "ts") {
     return parseTs(filePath);
   } else {
-    return parseTs(filePath);
+    return parseVue(filePath);
   }
 };
 
@@ -64,3 +66,5 @@ export const checkPropertyAccess: CheckPropertyAccess = (
     };
   }
 };
+
+export * from "./parseVue.js";

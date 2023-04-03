@@ -19,3 +19,4 @@ export const CODEFILETYPE = {
     TS: "ts",
     VUE: "vue",
 };
+export const VUETEMPTSDIR = "vue_temp_ts_dir";

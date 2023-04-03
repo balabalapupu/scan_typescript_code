@@ -1,5 +1,6 @@
 import tsCompiler from "typescript";
 import { CodeAnalysisCore } from "../src/codeAnalysis";
+import { ParseTsReturnType } from "../src/parse";
 export type Compute<A> = A extends () => unknown ? A : { [K in keyof A]: A[K] };
 export type Merge<O1 extends object, O2 extends object> = Compute<
   O1 & Omit<O2, keyof O1>
@@ -24,8 +25,10 @@ export type ScanSourceType = {
 };
 
 export type analysisModalType = {
-  analysisTarget: string;
-  analysisPlugins?: [];
+  analysisImportsTarget: string;
+  analysisIdentifierTarget?: string[];
+  analysisPlugins?: any[];
+  browserApiTarget?: string[];
 };
 
 export type PromiseCallback = (config: unknown) => void;
@@ -95,56 +98,41 @@ export type PluginContextType = {
   };
 };
 
-export type CodeAnalysisContextType = {
-  scanSourceConfig: ScanSourceType[];
-  analysisTarget: string;
-  importItemMap: ImportItemMap;
-  pluginsQueue: PluginType[];
-  addDiagnosisInfo: (config: DiagnosisInfosType) => void;
-  analysis: () => void;
-};
-
 export type CODEFILETYPE = "ts" | "vue";
-
-export type CodeAnalysisCoreType = CodeAnalysisContextType & PluginContextType;
-
-export namespace CodeAnalysisCoreNameSpace {
-  export class CodeAnalysisCore {
-    scanSourceConfig!: ScanSourceType[];
-    analysisTarget!: string;
-    importItemMap!: ImportItemMap;
-    pluginsQueue!: PluginType[];
-    addDiagnosisInfo!: (config: DiagnosisInfosType) => void;
-    analysis!: () => void;
-  }
-}
 
 export type DiagnosisInfosType = {
   projectName: string;
-  matchImportItem: ImportItemsTargetType;
-  apiName: string;
+  matchImportItem?: ImportItemsTargetType;
+  apiName?: string;
   file: string;
-  line: number;
+  line?: number;
   stack: any;
 };
 
-type HookConfigType = {
+export type HookCallback<T extends HookList> = (config: T) => boolean;
+
+export type PluginFuncReturnType<T extends HookList> = {
+  mapName: string;
+  hookType: string;
+  pluginCallbackFunction: HookCallback<T>;
+};
+export type PluginFuncType<T extends HookList> = (
+  analysisContext: CodeAnalysisCore
+) => PluginFuncReturnType<T>;
+
+export type AfterParseHookArgType = {
+  AST: ParseTsReturnType["AST"];
+  typeChecking: tsCompiler.TypeChecker;
+  baseLine: number;
+  filePath: string;
+};
+
+export type HookList = AfterParseHookArgType | AfterAnalysisHookArgType;
+
+export type AfterAnalysisHookArgType = {
   context: CodeAnalysisCore;
   tsCompiler: typeof import("typescript");
   node: tsCompiler.Node;
   matchImportItem: ImportItemsTargetType;
 } & Record<"apiName" | "filePath" | "projectName", string> &
   Record<"depth" | "line", number>;
-
-export type HookFunctionType = (config: HookConfigType) => boolean;
-
-export type PluginType = {
-  mapName: string;
-} & Record<
-  "pluginCallbackFunction" | "pluginCallbackFunctionAfterHook",
-  HookFunctionType | null
->;
-
-export type PluginFunctionType = (
-  analysisContext: CodeAnalysisCore
-) => PluginType;

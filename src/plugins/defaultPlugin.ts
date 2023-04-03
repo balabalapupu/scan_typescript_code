@@ -1,17 +1,17 @@
-import tsCompiler from "typescript";
 import {
-  HookFunctionType,
-  ImportItemsTargetType,
-  PluginFunctionType,
+  AfterAnalysisHookArgType,
+  HookCallback,
+  PluginFuncType,
 } from "../../type";
-import { CodeAnalysisCore } from "../codeAnalysis";
 
-const defaultPlugin: PluginFunctionType = (analysisContext) => {
-  const mapName = "apiUsedForIdentifierMap";
+const defaultPlugin: PluginFuncType<AfterAnalysisHookArgType> = (
+  analysisContext
+) => {
+  const mapName = "variableDeclarationCheckMap";
   // 在分析实例上下文挂载副作用
-  Reflect.set(analysisContext, mapName, {});
+  Reflect.set(analysisContext["pluginStoreList"], mapName, {});
 
-  const isApiCheck: HookFunctionType = ({
+  const isApiCheck: HookCallback<AfterAnalysisHookArgType> = ({
     context,
     apiName,
     matchImportItem,
@@ -20,47 +20,37 @@ const defaultPlugin: PluginFunctionType = (analysisContext) => {
     line,
   }) => {
     try {
-      if (!context["pluginStoreList"][mapName][apiName]) {
-        Reflect.set(context["pluginStoreList"][mapName], apiName, {
-          callName: 1,
+      const storePos = context["pluginStoreList"][mapName];
+      if (!storePos[apiName]) {
+        Reflect.set(storePos, apiName, {
+          callNum: 1,
           callOrigin: matchImportItem.origin,
           callFiles: {},
         });
 
+        Reflect.set(storePos[apiName].callFiles, filePath, {
+          projectName: projectName,
+          lines: [line],
+        });
+      } else {
         Reflect.set(
-          context["pluginStoreList"][mapName][apiName].callFiles,
-          filePath,
-          {
+          storePos[apiName],
+          "callNum",
+          storePos[apiName]["callNum"] + 1
+        );
+        if (!Object.keys(storePos[apiName].callFiles).includes(filePath)) {
+          Reflect.set(storePos[apiName].callFiles, filePath, {
             projectName: projectName,
             lines: [line],
-          }
-        );
-        // context[mapName][apiName].callFiles[filePath].httpRepo = httpRepo;
-      } else {
-        context["pluginStoreList"].mapName.apiName.callNum++;
-        if (
-          !Object.keys(
-            context["pluginStoreList"][mapName][apiName].callFiles
-          ).includes(filePath)
-        ) {
-          Reflect.set(
-            context["pluginStoreList"][mapName][apiName].callFiles,
-            filePath,
-            {
-              projectName: projectName,
-              lines: [line],
-            }
-          );
+          });
           //   context[mapName][apiName].callFiles[filePath].httpRepo = httpRepo;
         } else {
-          context["pluginStoreList"][mapName][apiName].callFiles[
-            filePath
-          ].lines.push(line);
+          storePos[apiName].callFiles[filePath].lines.push(line);
         }
       }
+
       return true; // true: 命中规则, 终止执行后序插件
     } catch (e: any) {
-      // console.log(e);
       const info = {
         projectName: projectName,
         matchImportItem: matchImportItem,
@@ -79,7 +69,7 @@ const defaultPlugin: PluginFunctionType = (analysisContext) => {
   return {
     mapName: mapName,
     pluginCallbackFunction: isApiCheck,
-    pluginCallbackFunctionAfterHook: null,
+    hookType: "afterAnalysisHook",
   };
 };
 

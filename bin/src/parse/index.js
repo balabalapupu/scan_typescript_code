@@ -1,10 +1,11 @@
 import tsCompiler from "typescript";
+import { parseVue } from "./parseVue.js";
 export const parseFilesForAST = (filePath, parseType) => {
     if (parseType == "ts") {
         return parseTs(filePath);
     }
     else {
-        return parseTs(filePath);
+        return parseVue(filePath);
     }
 };
 export const parseTs = (fileName) => {
@@ -36,3 +37,4 @@ export const checkPropertyAccess = (node, index = 0, apiName = "") => {
         };
     }
 };
+export * from "./parseVue.js";

@@ -1,31 +1,30 @@
 import chalk from "chalk";
 import {
   ASTTemTypeCheckType,
-  CodeAnalysisCoreType,
   ConfigTypeType,
   DiagnosisInfosType,
   EntryType,
   ImportItemMap,
   ImportItemsTargetType,
   ImportItemType,
-  PluginType,
   ScanSourceType,
-  CodeAnalysisCoreNameSpace,
   PluginContextType,
+  HookList,
 } from "../../type";
 import { CODEFILETYPE } from "../constant/index.js";
 import { scanFilesForEntirys } from "../file/index.js";
+import processLog from "single-line-log";
 import {
   checkPropertyAccess,
   parseFilesForAST,
-  parseTs,
   ParseTsReturnType,
 } from "../parse/index.js";
 import tsCompiler from "typescript";
+import identifierCheck from "../../IdetifierPlugin.js";
 
 import defaultPlugin from "../plugins/defaultPlugin.js";
 import methodPlugin from "../plugins/methodPlugin.js";
-// import { PluginContextType, EntryType } from "../../type/index";
+import typePlugin from "../plugins/typePlugin.js";
 
 type CODEFILETYPE = "ts" | "vue";
 type runAnalysisPluginsConfigType = {
@@ -53,24 +52,40 @@ type analysisImportDeclarationForASTConfigType = {
   baseLine?: number;
 };
 
-export namespace CodeAnalysisCore {
-  export type pluginsQueue = PluginType[];
+type analysisImportsTargetFuncArgType = {
+  AST: ParseTsReturnType["AST"];
+  typeChecking: tsCompiler.TypeChecker;
+  baseLine: number;
+  filePath: string;
+  config: EntryType;
+};
 
+type hookQueue = any[];
+
+export namespace CodeAnalysisCore {
   export type diagnosisInfos = DiagnosisInfosType[];
 
   export type pluginStoreList = PluginContextType;
 
   export type importItemMap = ImportItemMap;
 
+  export type analysisPlugins = string[];
+
+  export type analysisIdentifierTarget = string[];
+
+  export type hookNameMap = Set<string>;
+
+  export type browserApiTarget = string[];
+
   export type runAnalysisPlugins = (
     config: runAnalysisPluginsConfigType
   ) => void;
 
-  export type installPlugins = () => void;
+  export type installPlugins = (config: any[]) => void;
 
   export type analysis = () => void;
 
-  export type scanCode<T> = (
+  export type scanCodeFormConfig<T> = (
     config: ConfigTypeType["scanSource"],
     type: T
   ) => void;
@@ -86,23 +101,65 @@ export namespace CodeAnalysisCore {
   ) => ImportItemType;
 
   export type addDiagnosisInfo = (info: DiagnosisInfosType) => void;
+
+  export type AnalysisImportsTargetFuncType = (
+    config: analysisImportsTargetFuncArgType
+  ) => void;
 }
+
+type CallHook = () => void;
 
 export class CodeAnalysisCore {
   private scanSourceConfig: ScanSourceType[];
-  private analysisTarget: string;
+  private analysisImportsTarget: string;
+  public analysisIdentifierTarget: CodeAnalysisCore.analysisIdentifierTarget;
+  public afterParseHookQueue: hookQueue;
+  public afterAnalysisHookQueue: hookQueue;
+  public hookFuncionQueue: hookQueue;
   public importItemMap: CodeAnalysisCore.importItemMap;
-  public pluginsQueue: CodeAnalysisCore.pluginsQueue;
   public diagnosisInfos: CodeAnalysisCore.diagnosisInfos;
   public pluginStoreList: CodeAnalysisCore.pluginStoreList;
+  public analysisPlugins: CodeAnalysisCore.analysisPlugins;
+  public hookNameMap: CodeAnalysisCore.hookNameMap;
+  public browserApiTarget: CodeAnalysisCore.browserApiTarget;
 
   constructor(options: ConfigTypeType) {
+    // 扫描路径配置
     this.scanSourceConfig = options.scanSource;
-    this.analysisTarget = options.analysisTarget;
+    // import 生命查找配置
+    this.analysisImportsTarget = options.analysisImportsTarget;
+    // 目标标识符配置
+    this.analysisIdentifierTarget =
+      options.analysisIdentifierTarget || ([] as string[]);
+    // 自定义插件
+    this.analysisPlugins = options.analysisPlugins || ([] as string[]);
+    this.browserApiTarget = options.browserApiTarget || ([] as string[]);
+
+    // 内置插件
+    this.hookFuncionQueue = [
+      identifierCheck,
+      methodPlugin,
+      typePlugin,
+      defaultPlugin,
+    ]; // 先用这个顶一下 hook，可以改成tapable
+    this.afterParseHookQueue = [];
+    this.afterAnalysisHookQueue = [];
     this.importItemMap = {};
-    this.pluginsQueue = [];
     this.diagnosisInfos = []; // 诊断日志信息
     this.pluginStoreList = {};
+    this.hookNameMap = new Set();
+  }
+
+  callHook(hookQueue: hookQueue, config: HookList, index: number) {
+    if (hookQueue.length == 0) return;
+    const ch = hookQueue[index];
+    this.hookNameMap.add(ch.mapName);
+    const res: boolean = ch.pluginCallbackFunction(config);
+    if (!res && index < hookQueue.length - 1) {
+      this.callHook(hookQueue, config, index + 1);
+    } else {
+      return false;
+    }
   }
 
   runAnalysisPlugins: CodeAnalysisCore.runAnalysisPlugins = ({
@@ -115,57 +172,57 @@ export class CodeAnalysisCore {
     projectName,
     line,
   }) => {
-    if (this.pluginsQueue.length > 0) {
-      for (let i = 0; i < this.pluginsQueue.length; i++) {
-        const pluginCallbackFunction =
-          this.pluginsQueue[i].pluginCallbackFunction;
-        if (
-          pluginCallbackFunction &&
-          pluginCallbackFunction({
-            context: this,
-            tsCompiler,
-            node: baseNode,
-            depth,
-            apiName,
-            matchImportItem,
-            filePath,
-            projectName,
-            line,
-          })
-        ) {
-          break;
-        }
-      }
-    }
+    this.callHook(
+      this.afterAnalysisHookQueue,
+      {
+        context: this,
+        tsCompiler,
+        node: baseNode,
+        depth,
+        apiName,
+        matchImportItem,
+        filePath,
+        projectName,
+        line,
+      },
+      0
+    );
   };
 
   // 注册插件
-  installPlugins: CodeAnalysisCore.installPlugins = () => {
-    this.pluginsQueue.push(methodPlugin(this));
-    this.pluginsQueue.push(defaultPlugin(this));
+  installPlugins: CodeAnalysisCore.installPlugins = (plugins) => {
+    if (plugins.length > 0) {
+      plugins.forEach((item) => {
+        const res = item(this);
+        if (res.hookType == "afterParseHook") {
+          this.afterParseHookQueue.push(res);
+        } else if ((res.hookType = "afterAnalysisHook")) {
+          this.afterAnalysisHookQueue.push(res);
+        }
+      });
+    }
   };
 
   public analysis: CodeAnalysisCore.analysis = () => {
     // 注册插件
-    this.installPlugins();
-    this.scanCode(this.scanSourceConfig, "ts");
+    this.installPlugins(this.hookFuncionQueue);
+
+    console.log(chalk.green("文件扫描开始"));
+    this.scanCodeFormConfig(this.scanSourceConfig, "vue");
+    this.scanCodeFormConfig(this.scanSourceConfig, "ts");
   };
 
-  private scanCode: CodeAnalysisCore.scanCode<CODEFILETYPE> = (
-    config,
-    PluginContextType
-  ) => {
-    // 拿到所有需要扫描的文件路径，可能有多个scanSource
-    const entrys = scanFilesForEntirys(config, PluginContextType);
+  private scanCodeFormConfig: CodeAnalysisCore.scanCodeFormConfig<CODEFILETYPE> =
+    (config, PluginContextType) => {
+      // 拿到所有需要扫描的文件路径，可能有多个scanSource
+      const entrys = scanFilesForEntirys(config, PluginContextType);
 
-    console.log(chalk.green("文件扫描开始："));
-    console.log(entrys, "---entrys---");
-    entrys.forEach((item) => {
-      // 从入口开始扫描文件
-      this.parseCodeAndReport(item, PluginContextType);
-    });
-    return;
-  };
+      entrys.forEach((item) => {
+        // 从入口开始扫描文件
+        this.parseCodeAndReport(item, PluginContextType);
+      });
+      return;
+    };
 
   parseCodeAndReport: CodeAnalysisCore.parseCodeAndReport<CODEFILETYPE> = (
     config,
@@ -173,21 +230,67 @@ export class CodeAnalysisCore {
   ) => {
     const parseFiles = config.parse || [];
     if (!parseFiles.length) return;
+    console.log("\n|-文件类型:", chalk.green(type));
+    console.log("|-分析进度:");
     // 根据当前文件夹下的依赖在做遍历
     parseFiles.forEach((_item, _index) => {
       const filePath = config.name + "&" + parseFiles[_index];
+      processLog.stdout(
+        `|--${chalk.green(
+          `${_index + 1}/${parseFiles.length}      ${filePath}`
+        )}`
+      );
+      try {
+        // 1、 生成 AST
+        const {
+          AST,
+          typeChecking,
+          baseLine = 0,
+        } = parseFilesForAST(_item, type);
+        this.callHook(
+          this.afterParseHookQueue,
+          {
+            AST,
+            typeChecking,
+            baseLine,
+            filePath,
+          },
+          0
+        );
 
-      // 1、 生成 AST
-      const { AST, typeChecking } = parseFilesForAST(_item, type);
+        // 查找 ImportDeclaration
+        if (this.analysisImportsTarget) {
+          this.analysisImportsTargetFunc({
+            AST,
+            typeChecking,
+            baseLine,
+            filePath,
+            config,
+          });
+        }
+      } catch (error: any) {
+        const info = {
+          projectName: config.name,
+          file: parseFiles[_index],
+          stack: error.stack,
+        };
+        this.addDiagnosisInfo(info);
+      }
+    });
+  };
 
+  private analysisImportsTargetFunc: CodeAnalysisCore.AnalysisImportsTargetFuncType =
+    ({ AST, baseLine, typeChecking, filePath, config }) => {
       // 2、 查找文件内 Import
       const importItems = this.analysisImportDeclarationForAST({
         AST,
         filePath,
+        baseLine,
       });
 
       // 3、查找 Import 对应的 使用位置
       if (Object.keys(importItems).length == 0) return;
+
       this.analysisIdentifierForAST({
         importItems,
         AST,
@@ -196,8 +299,7 @@ export class CodeAnalysisCore {
         projectName: config.name,
         baseLine: 0,
       });
-    });
-  };
+    };
 
   // 这次遍历就是分析啦 identifer
   private analysisIdentifierForAST: CodeAnalysisCore.analysisIdentifierForAST =
@@ -288,7 +390,7 @@ export class CodeAnalysisCore {
         const moduleSpecifier =
           node.moduleSpecifier as tsCompiler.LiteralExpression;
 
-        if (moduleSpecifier.text !== _thiz.analysisTarget) return; // 当前 AST 节点字面量就是要查找的字面量
+        if (moduleSpecifier.text !== _thiz.analysisImportsTarget) return; // 当前 AST 节点字面量就是要查找的字面量
 
         if (!node.importClause) return; // import 格式有问题
 
