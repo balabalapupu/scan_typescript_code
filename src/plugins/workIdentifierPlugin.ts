@@ -63,11 +63,18 @@ const pluginFunc: IdentifierPluginFuncType<workPluginFuncArg> = (
       node.escapedText &&
       targetIndetifier.includes(node.escapedText)
     ) {
-      if (!node.parent)
+      if (
+        !node.parent ||
+        tsCompiler.isTypeReferenceNode(node.parent) ||
+        tsCompiler.isImportSpecifier(node.parent) ||
+        Reflect.has(node, "moduleSpecifier")
+      ) {
         return {
           queueIntercept: true,
           queueReportReuslt: analysisDetail,
         };
+      }
+
       const { apiName } = checkPropertyAccess(node); // 获取基础分析节点信息
 
       const storePos: any = analysisDetail;

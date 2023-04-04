@@ -28,9 +28,9 @@ import {
 import tsCompiler from "typescript";
 
 import defaultPlugin from "../plugins/defaultPlugin.js";
-// import browserPlugin from "../plugins/browserPlugin.js";
 
 import workIdentifierPlugin from "../plugins/workIdentifierPlugin.js";
+import workTypeReferencePlugin from "../plugins/workTypeReferencePlugin.js";
 
 const runSerice = (workerData: any) => {
   return new Promise((resolve, reject) => {
@@ -156,7 +156,11 @@ export class CodeAnalysisCore {
     // 自定义插件
 
     // 内置插件
-    this.hookFuncionQueue = [defaultPlugin, workIdentifierPlugin]; // 先用这个顶一下 hook，可以改成tapable
+    this.hookFuncionQueue = [
+      defaultPlugin,
+      workIdentifierPlugin,
+      workTypeReferencePlugin,
+    ]; // 先用这个顶一下 hook，可以改成tapable
     this.importItemMap = {};
     this.diagnosisInfos = []; // 诊断日志信息
     // this.hookNameMap = new Set();
@@ -211,7 +215,7 @@ export class CodeAnalysisCore {
       const parseFiles = config.parse || [];
       if (!parseFiles.length) return;
       const reportForCheckIdentifier: ReportDataType = this.workReport;
-      console.log(parseFiles, "---parseFiles---");
+      console.log("扫描文件:", chalk.green(parseFiles));
       const res = (await Promise.all(
         parseFiles.map((item) => {
           return new Promise(async (resolve, reject) => {
@@ -238,7 +242,6 @@ export class CodeAnalysisCore {
               )) as unknown as ReportDataType;
               res = { ...identifierAnalysis };
             }
-            console.log("wodaole?");
             // 分析 导入关系
             if (this.analysisImportsTarget) {
               const importAnalysis = (await this.runPluginworker(
@@ -252,7 +255,6 @@ export class CodeAnalysisCore {
                 },
                 "../worker/importdeclarationworker.js"
               )) as unknown as ReportDataType;
-              console.log("haishiyouwenti");
               res = { ...res, ...importAnalysis };
             }
             resolve(res);

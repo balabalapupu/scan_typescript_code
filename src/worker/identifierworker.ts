@@ -83,6 +83,5 @@ function getSingleworkerReport(
 ): ReportDataType {
   const reportSingleworker: ReportDataType = {};
   callHook(hookQueue, workInfo, 0, reportSingleworker);
-
   return reportSingleworker;
 }

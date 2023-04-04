@@ -39,7 +39,6 @@ const importItemMap: CodeAnalysisCore.importItemMap = {};
 const { filePath, hookMap, analysisImportsTarget, baseLine, config } =
   workerData;
 const reportSingleworker: ReportDataType = {};
-
 // 查找需要分析的 import
 const analysisImportDeclarationForAST: CodeAnalysisCore.analysisImportDeclarationForAST =
   ({ AST, filePath, baseLine = 0 }) => {
@@ -53,7 +52,6 @@ const analysisImportDeclarationForAST: CodeAnalysisCore.analysisImportDeclaratio
       // 获取节点行
       const line =
         AST.getLineAndCharacterOfPosition(node.getStart()).line + baseLine + 1;
-
       // 判断是否是 ImportDeclaration
       if (!tsCompiler.isImportDeclaration(node)) return;
 
@@ -61,7 +59,6 @@ const analysisImportDeclarationForAST: CodeAnalysisCore.analysisImportDeclaratio
 
       const moduleSpecifier =
         node.moduleSpecifier as tsCompiler.LiteralExpression;
-
       if (moduleSpecifier.text !== analysisImportsTarget) return; // 当前 AST 节点字面量就是要查找的字面量
 
       if (!node.importClause) return; // import 格式有问题
@@ -183,8 +180,6 @@ function getSingleworkerReport(
 
   return reportSingleworker;
 }
-
-console.log(1, "---1---");
 
 function callHook(
   hookQueue: FuncList[],

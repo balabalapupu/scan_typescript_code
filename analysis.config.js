@@ -10,12 +10,5 @@ module.exports = {
   ],
   analysisImportsTarget: "111", // 必须，要分析的目标依赖名
   analysisIdentifierTarget: ["wocao"],
-  browserApiTarget: [],
   analysisPlugins: [], // 可选，自定义分析插件，默认为空数组，一般不需要配置
-  reportDir: "docs", // 可选，生成代码分析报告的目录，默认为'report',不支持多级目录配置
-  reportTitle: "Code-Demo代码分析报告", // 可选，代码分析报告标题，默认为'代码依赖分析报告'
-  isScanVue: true, // 可选，是否要扫描分析vue中的ts代码，默认为false
-  scorePlugin: "default", // 可选，评分插件: Function|'default'|null, default表示运行默认插件，默认为null表示不评分
-  // scorePlugin: myScoreDeal,
-  alarmThreshold: 90, // 可选，开启代码告警及阈值分数(0-100)，默认为null即关闭告警逻辑 (CLI模式生效)
 };
