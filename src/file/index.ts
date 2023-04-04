@@ -22,7 +22,6 @@ export const scanFilesForEntirys: scanFilesForEntries<CODEFILETYPE> = (
       name: item.name,
     };
     const parse: string[] = [],
-      show: string[] = [],
       scanPath = item.path;
 
     scanPath.forEach((_item) => {
@@ -33,11 +32,9 @@ export const scanFilesForEntirys: scanFilesForEntries<CODEFILETYPE> = (
         tempEntry = scanFileVue(_item);
       }
       parse.push(...tempEntry);
-      show.push(...tempEntry);
     });
 
     Reflect.set(entryObj, "parse", parse);
-    Reflect.set(entryObj, "show", show);
     entrys.push(entryObj);
   });
 

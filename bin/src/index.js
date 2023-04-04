@@ -15,33 +15,32 @@ export function codeAnalysis(config) {
     rmDir(VUETEMPTSDIR);
     // 如果需要扫描vue文件，创建temp目录
     mkDir(VUETEMPTSDIR);
-    const res = new Promise((resolve, reject) => codeAnalysisCallback(resolve, reject, config));
+    const res = new Promise(async (resolve, reject) => await codeAnalysisCallback(resolve, reject, config));
     spinner.succeed("项目完成");
     return res;
 }
-function codeAnalysisCallback(resolve, reject, config) {
+async function codeAnalysisCallback(resolve, reject, config) {
     try {
         const startTime = new Date().getTime();
         const coderTask = new CodeAnalysisCore(config);
-        coderTask.analysis();
+        await coderTask.analysis();
         //各种插件的名称
-        const mapNames = coderTask.hookNameMap;
+        const mapNames = [
+            ...coderTask.hookIdentifierMap.keys(),
+            ...coderTask.hookImportMap.keys(),
+        ];
         const endTime = new Date().getTime();
         const time = moment(Date.now()).format("YYYY.MM.DD HH:mm:ss");
         const report = {
-            importItemMap: coderTask.importItemMap,
-            pluginAnalysis: {},
+            // importItemMap: coderTask.importItemMap,
+            pluginAnalysis: coderTask.workReport,
             analysisTime: time,
             mapNames: mapNames,
         };
         console.log("\n|-项目耗时:", chalk.green(endTime - startTime));
-        if (Array(...mapNames).length > 0) {
-            mapNames.forEach((item) => {
-                const pluginAnalysis = report["pluginAnalysis"];
-                pluginAnalysis[item] = coderTask["pluginStoreList"][item];
-            });
-        }
         reportOutput(report);
+        console.log(3333, "---3333---");
+        rmDir(VUETEMPTSDIR);
         resolve({
             report: report,
         });
@@ -53,7 +52,7 @@ function codeAnalysisCallback(resolve, reject, config) {
 function reportOutput(report) {
     // console.log("|-实际使用模块:", chalk.green(report.mapNames.join("、")));
     console.log("|-生成时间:", chalk.green(report.analysisTime));
-    const _table = [["模块名称", "分析目标", "分析字段", "详情"]];
+    const _table = [["模块名称", "字段", "", ""]];
     Reflect.ownKeys(report["pluginAnalysis"]).forEach((item) => {
         _table.push([chalk.green(item), "", "", ""]);
         Reflect.ownKeys(report["pluginAnalysis"][item]).forEach((_item) => {

@@ -62,7 +62,7 @@ export type ImportItemType = {
 
 export type ImportItemMap = {
   [propName: string]: {
-    callOrigin: ASTTempType["origin"];
+    callOrigin?: ASTTempType["origin"];
     callFiles: string[];
   };
 };
@@ -92,7 +92,7 @@ export type PluginContextType = {
   [propName: string]: {
     [propName: string]: {
       callNum: number;
-      callOrigin: unknown;
+      callOrigin?: unknown;
       callFiles: CallFilesType;
     };
   };
@@ -116,15 +116,37 @@ export type PluginFuncReturnType<T extends HookList> = {
   hookType: string;
   pluginCallbackFunction: HookCallback<T>;
 };
-export type PluginFuncType<T extends HookList> = (
-  analysisContext: CodeAnalysisCore
-) => PluginFuncReturnType<T>;
+export type PluginFuncType<T extends HookList> = () => PluginFuncReturnType<T>;
 
 export type AfterParseHookArgType = {
   AST: ParseTsReturnType["AST"];
   typeChecking: tsCompiler.TypeChecker;
   baseLine: number;
   filePath: string;
+};
+
+export type workPluginFuncArg = {
+  AST: ParseTsReturnType["AST"];
+  typeChecking?: tsCompiler.TypeChecker;
+  baseLine: number;
+  filePath: string;
+  analysisIdentifierTarget: string[];
+};
+
+// ------------
+export type workPluginContextType = {
+  queueIntercept: boolean;
+  queueReportReuslt: {
+    [propName: string]: {
+      callNum: number;
+      callOrigin?: unknown;
+      callFiles: CallFilesType;
+    };
+  };
+};
+
+export type ReportDataType = {
+  [propName: string]: workPluginContextType["queueReportReuslt"];
 };
 
 export type HookList = AfterParseHookArgType | AfterAnalysisHookArgType;

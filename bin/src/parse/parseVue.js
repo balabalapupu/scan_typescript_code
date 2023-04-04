@@ -31,4 +31,26 @@ const parseVue = (fileName) => {
     const typeChecking = program.getTypeChecker();
     return { AST, typeChecking, baseLine };
 };
-export { parseVue };
+const parseVueBeforeworker = (fileName) => {
+    // 获取vue代码
+    const vueCode = getCode(fileName);
+    // 解析vue代码
+    const result = vueCompiler.parse(vueCode);
+    const children = result.children;
+    // 获取script片段
+    let tsCode = "";
+    let baseLine = 0;
+    children.forEach((element) => {
+        if (element.tag && element.tag == "script") {
+            const _children = element.children;
+            tsCode = _children[0]?.content;
+            baseLine = element.loc.start.line - 1;
+        }
+    });
+    const ts_hash_name = md5(fileName);
+    // 将ts片段写入临时目录下的ts文件中
+    writeTsFile(tsCode, `${VUETEMPTSDIR}/${ts_hash_name}`);
+    const vue_temp_ts_name = path.join(process.cwd(), `${VUETEMPTSDIR}/${ts_hash_name}.ts`);
+    return { filePathVue: vue_temp_ts_name, baseLineVue: baseLine };
+};
+export { parseVue, parseVueBeforeworker };
