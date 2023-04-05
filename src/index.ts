@@ -27,7 +27,7 @@ export function codeAnalysis(config: ConfigTypeType) {
     async (resolve, reject) =>
       await codeAnalysisCallback(resolve, reject, config)
   );
-  spinner.succeed("项目完成");
+  spinner.succeed("======");
   return res;
 }
 

@@ -18,6 +18,7 @@ export type PluginFuncArg = {
   filePath: string;
   projectName: string;
   baseLine: number;
+  originFilePath: string;
 };
 type FuncList = {
   pluginName: string;
@@ -36,8 +37,14 @@ export type workInsideHookType = {
 export type workCallbackFunc = (config: PluginFuncArg) => workPluginContextType;
 
 const importItemMap: CodeAnalysisCore.importItemMap = {};
-const { filePath, hookMap, analysisImportsTarget, baseLine, config } =
-  workerData;
+const {
+  filePath,
+  hookMap,
+  analysisImportsTarget,
+  baseLine,
+  config,
+  originFilePath,
+} = workerData;
 const reportSingleworker: ReportDataType = {};
 // 查找需要分析的 import
 const analysisImportDeclarationForAST: CodeAnalysisCore.analysisImportDeclarationForAST =
@@ -143,6 +150,7 @@ const analysisImportsTargetFunc: CodeAnalysisCore.AnalysisImportsTargetFuncType 
       projectName: config.name,
       baseLine,
       filePath,
+      originFilePath,
     });
     return report;
   };
@@ -218,5 +226,7 @@ const report: ReportDataType = analysisImportsTargetFunc({
 });
 
 _parentPort.postMessage(report);
+
+process.exit();
 
 // 插件调用队列

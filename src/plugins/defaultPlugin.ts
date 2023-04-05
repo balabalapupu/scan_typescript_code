@@ -46,13 +46,23 @@ const pluginFunc: IdentifierPluginFuncType<PluginFuncArg> = (
   config,
   analysisDetail
 ) => {
-  const { importItems, AST, typeChecking, projectName, baseLine, filePath } =
-    config;
+  const {
+    importItems,
+    AST,
+    typeChecking,
+    projectName,
+    baseLine,
+    filePath,
+    originFilePath,
+  } = config;
+
+  const _filePath =
+    originFilePath !== "" ? (originFilePath as string) : filePath;
 
   const ImportItemNames = Object.keys(importItems);
   // 遍历AST
-  function walk(node: tsCompiler.Node) {
-    tsCompiler.forEachChild(node, walk);
+  function dfs(node: tsCompiler.Node) {
+    tsCompiler.forEachChild(node, dfs);
 
     if (!AST) return;
 
@@ -83,13 +93,14 @@ const pluginFunc: IdentifierPluginFuncType<PluginFuncArg> = (
             matchImportItem.symbolEnd == nodeSymbol.end
           ) {
             if (!node.parent) return;
-            const { baseNode, depth, apiName } = checkPropertyAccess(node); // 获取基础分析节点信息
+            const { baseNode, apiName } = checkPropertyAccess(node); // 获取基础分析节点信息
+
             storeApi(
               analysisDetail,
               {
                 apiName,
                 matchImportItem,
-                filePath,
+                filePath: _filePath,
                 projectName,
                 line,
               },
@@ -100,7 +111,7 @@ const pluginFunc: IdentifierPluginFuncType<PluginFuncArg> = (
       }
     }
   }
-  walk(AST as tsCompiler.Node);
+  dfs(AST as tsCompiler.Node);
 
   return {
     queueIntercept: true,

@@ -18,6 +18,7 @@ type workInfoType = {
   baseLine: number;
   filePath: string;
   analysisIdentifierTarget: string[];
+  originFilePath: string;
 };
 
 export type workOutsideHookFunc = () => workInsideHookType;
@@ -39,8 +40,8 @@ const {
   hookMap,
   analysisIdentifierTarget,
   baseLine = 0,
+  originFilePath,
 } = workerData;
-
 if (!hookMap.size) {
   _parentPort.postMessage(null);
 }
@@ -54,8 +55,8 @@ const report: ReportDataType = getSingleworkerReport(hookQueue, {
   baseLine,
   filePath,
   analysisIdentifierTarget,
+  originFilePath,
 });
-
 _parentPort.postMessage(report);
 
 // 插件调用队列
@@ -85,3 +86,5 @@ function getSingleworkerReport(
   callHook(hookQueue, workInfo, 0, reportSingleworker);
   return reportSingleworker;
 }
+
+process.exit();

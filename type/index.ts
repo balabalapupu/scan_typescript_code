@@ -130,6 +130,7 @@ export type workPluginFuncArg = {
   typeChecking?: tsCompiler.TypeChecker;
   baseLine: number;
   filePath: string;
+  originFilePath?: string;
   analysisIdentifierTarget: string[];
 };
 

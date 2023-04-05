@@ -43,7 +43,7 @@ const identifierCheck: workOutsideHookFunc = () => {
 };
 
 const pluginFunc: IdentifierPluginFuncType<workPluginFuncArg> = (
-  { AST, baseLine, filePath, analysisIdentifierTarget },
+  { AST, baseLine, filePath, analysisIdentifierTarget, originFilePath },
   analysisDetail
 ) => {
   const targetIndetifier = analysisIdentifierTarget;
@@ -52,8 +52,8 @@ const pluginFunc: IdentifierPluginFuncType<workPluginFuncArg> = (
       queueIntercept: true,
       queueReportReuslt: analysisDetail,
     };
-  function walk(node: tsCompiler.Node) {
-    tsCompiler.forEachChild(node, walk);
+  function dfs(node: tsCompiler.Node) {
+    tsCompiler.forEachChild(node, dfs);
     if (!AST) return analysisDetail;
     const line =
       AST.getLineAndCharacterOfPosition(node.getStart()).line + baseLine + 1;
@@ -77,6 +77,9 @@ const pluginFunc: IdentifierPluginFuncType<workPluginFuncArg> = (
 
       const { apiName } = checkPropertyAccess(node); // 获取基础分析节点信息
 
+      const _filePath =
+        originFilePath !== "" ? (originFilePath as string) : filePath;
+
       const storePos: any = analysisDetail;
       if (!storePos[apiName]) {
         Reflect.set(storePos, apiName, {
@@ -84,7 +87,7 @@ const pluginFunc: IdentifierPluginFuncType<workPluginFuncArg> = (
           callFiles: {},
         });
 
-        Reflect.set(storePos[apiName].callFiles, filePath, {
+        Reflect.set(storePos[apiName].callFiles, _filePath, {
           lines: [line],
         });
       } else {
@@ -94,17 +97,17 @@ const pluginFunc: IdentifierPluginFuncType<workPluginFuncArg> = (
           storePos[apiName]["callNum"] + 1
         );
 
-        if (!Object.keys(storePos[apiName].callFiles).includes(filePath)) {
-          Reflect.set(storePos[apiName].callFiles, filePath, {
+        if (!Object.keys(storePos[apiName].callFiles).includes(_filePath)) {
+          Reflect.set(storePos[apiName].callFiles, _filePath, {
             lines: [line],
           });
         } else {
-          storePos[apiName].callFiles[filePath].lines.push(line);
+          storePos[apiName].callFiles[_filePath].lines.push(line);
         }
       }
     }
   }
-  walk(AST as tsCompiler.Node);
+  dfs(AST as tsCompiler.Node);
   return {
     queueIntercept: true,
     queueReportReuslt: analysisDetail,

@@ -215,10 +215,11 @@ export class CodeAnalysisCore {
       const parseFiles = config.parse || [];
       if (!parseFiles.length) return;
       const reportForCheckIdentifier: ReportDataType = this.workReport;
-      console.log("扫描文件:", chalk.green(parseFiles));
+
       const res = (await Promise.all(
         parseFiles.map((item) => {
           return new Promise(async (resolve, reject) => {
+            console.log("扫描文件:", chalk.green(item));
             let filePath = item,
               baseLine = 0;
             if (type == "vue") {
@@ -229,34 +230,46 @@ export class CodeAnalysisCore {
             }
             // 分析单独的字面量
             let res = {};
+
             if (this.analysisIdentifierTarget.length) {
+              const _param = {
+                filePath,
+                type,
+                baseLine,
+                hookMap: this.hookIdentifierMap,
+                analysisIdentifierTarget: this.analysisIdentifierTarget,
+                originFilePath: "",
+              };
+              if (baseLine !== 0) {
+                _param["originFilePath"] = item;
+              }
               const identifierAnalysis = (await this.runPluginworker(
-                {
-                  filePath,
-                  type,
-                  baseLine,
-                  hookMap: this.hookIdentifierMap,
-                  analysisIdentifierTarget: this.analysisIdentifierTarget,
-                },
+                _param,
                 "../worker/identifierworker.js"
               )) as unknown as ReportDataType;
               res = { ...identifierAnalysis };
             }
-            // 分析 导入关系
-            if (this.analysisImportsTarget) {
-              const importAnalysis = (await this.runPluginworker(
-                {
-                  filePath,
-                  type,
-                  config,
-                  baseLine,
-                  hookMap: this.hookImportMap,
-                  analysisImportsTarget: this.analysisImportsTarget,
-                },
-                "../worker/importdeclarationworker.js"
-              )) as unknown as ReportDataType;
-              res = { ...res, ...importAnalysis };
-            }
+            // // 分析 导入关系
+            // if (this.analysisImportsTarget) {
+            //   const _param = {
+            //     filePath,
+            //     type,
+            //     config,
+            //     baseLine,
+            //     hookMap: this.hookImportMap,
+            //     analysisImportsTarget: this.analysisImportsTarget,
+            //     originFilePath: "",
+            //   };
+            //   if (baseLine !== 0) {
+            //     _param["originFilePath"] = item;
+            //   }
+            //   const importAnalysis = (await this.runPluginworker(
+            //     _param,
+            //     "../worker/importdeclarationworker.js"
+            //   )) as unknown as ReportDataType;
+            //   res = { ...res, ...importAnalysis };
+            // }
+            console.log("扫描文件结束:", chalk.green(item));
             resolve(res);
           });
         })
